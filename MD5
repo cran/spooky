@@ -1,0 +1,11 @@
+b73cad76c1fda6076d1f6b2024ec83a7 *DESCRIPTION
+51a831a177fdee0b818698517ec4947d *NAMESPACE
+1ea65cd9ee6564b2079628d0454bdef1 *NEWS.md
+4b23a273100b6cf36360754b1fbc25df *R/data.R
+a7aa637e834e9370f8f9abd71238b41d *R/hood.R
+ef0334070fea0e4c24ddac44352521cf *R/main.R
+c5a50796c58bdf41a410c930e6fbe9d6 *R/spooky.R
+5218dea2272d99c1ec4089718cd7b166 *data/time_features.rda
+af6ffeab1fd2b2ce08e6273a5a46b8a5 *man/spooky.Rd
+07e2ab14b1ea6ec36b0575b82878a808 *man/time_features.Rd
+33099f18c4185f694bc8510b86bd83e5 *man/windower.Rd
