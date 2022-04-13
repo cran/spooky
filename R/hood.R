@@ -29,18 +29,19 @@ windower <- function(df, seq_len, lno = 1, n_windows = 5, ci = 0.8, dates = NULL
   too_short <- floor(n_length/(n_windows + 1)) <= seq_len
   if(too_short){stop("not enough data for the validation windows")}
   idx <- c(rep(1, n_length%%(n_windows + 1)), rep(1:(n_windows + 1), each = n_length/(n_windows + 1)))
-  models <- sapply(1:n_feats, function(f) purrr::map(1:n_windows, ~ engine(df[idx <= .x, f, drop = T], seq_len, lno, testing = head(df[idx == .x + 1, f, drop = T], seq_len), ci, dates, feat_names[f], error_scale, error_benchmark)), simplify = F)
-  errors <- purrr::map(purrr::map_depth(models, 2, ~ .x$errors), ~ colMeans(Reduce(rbind, .x)))
-  errors <- purrr::map(errors, ~ round(.x, 3))
+  models <- sapply(1:n_feats, function(f) map(1:n_windows, ~ engine(df[idx <= .x, f, drop = TRUE], seq_len, lno, testing = head(df[idx == .x + 1, f, drop = TRUE], seq_len), ci, dates, feat_names[f], error_scale, error_benchmark, collected_errors = NULL)), simplify = FALSE)
+  errors <- map(map_depth(models, 2, ~ .x$errors), ~ colMeans(Reduce(rbind, .x)))
+  errors <- map(errors, ~ round(.x, 3))
+  collected_errors <- map(map_depth(models, 2, ~ .x$raw_errors), ~ Reduce(rbind, .x))
   if(n_feats > 1){max_errors <- apply(Reduce(rbind, errors), 2, max)}
   if(n_feats == 1){max_errors <- unlist(errors)}
-  model <- sapply(1:n_feats, function(f) engine(df[, f, drop = T], seq_len, lno, testing = NULL, ci, dates, feat_names[f], error_scale, error_benchmark), simplify = F)
+  model <- sapply(1:n_feats, function(f) engine(df[, f, drop = TRUE], seq_len, lno, testing = NULL, ci, dates, feat_names[f], error_scale, error_benchmark, collected_errors = collected_errors[[f]]), simplify = FALSE)
   outcome <- list(errors = errors, max_errors = max_errors, model = model)
   return(outcome)
 }
 
 #########
-engine <- function(ts, seq_len, lno = 1, testing = NULL, ci = 0.8, dates = NULL, feat_name, error_scale, error_benchmark)
+engine <- function(ts, seq_len, lno = 1, testing = NULL, ci = 0.8, dates = NULL, feat_name, error_scale, error_benchmark, collected_errors)
 {
   orig <- ts
   diff_model <- recursive_diff(ts, best_deriv(ts))
@@ -49,38 +50,43 @@ engine <- function(ts, seq_len, lno = 1, testing = NULL, ci = 0.8, dates = NULL,
   all_negative_check <- all(orig < 0)
   n_length <- length(ts)
   transformed <- spectral_transformation(ts)
-  jacknife_index <- function(v, n) {ifelse(n <= 0, n <- 1, n); n <- n - 1; purrr::map(1:(length(v) - n), ~ v[- (.x:(.x+n))])}
+  jacknife_index <- function(v, n) {ifelse(n <= 0, n <- 1, n); n <- n - 1; map(1:(length(v) - n), ~ v[- (.x:(.x+n))])}
   idx_samples <- jacknife_index(1:length(ts), lno)
   n_trials <- length(idx_samples)
   cmplx <- transformed$complex
-  preds <- Reduce(rbind, purrr::map(idx_samples, ~ tail(spectral_inversion(c(cmplx[.x], vector("complex", seq_len))), seq_len)))
+  preds <- Reduce(rbind, map(idx_samples, ~ tail(spectral_inversion(c(cmplx[.x], vector("complex", seq_len))), seq_len)))
   preds <- t(apply(preds, 1, function(x) tail(invdiff(x, diff_model$tail_value), seq_len)))
   if(all_positive_check){preds[preds < 0] <- 0}
   if(all_negative_check){preds[preds > 0] <- 0}
 
   errors <- NULL
-  if(!is.null(testing)){errors <- my_metrics(testing, colMeans(preds), ts, error_scale, error_benchmark)}
+  raw_errors <- NULL
+  plot <- NULL
+  quantile_preds <- NULL
+  if(!is.null(testing)){errors <- my_metrics(testing, colMeans(preds), ts, error_scale, error_benchmark); raw_errors <- t(replicate(nrow(preds), testing)) - preds}
+  if(!is.null(collected_errors)){
+    quants <- sort(unique(c((1-ci)/2, 0.25, 0.5, 0.75, ci+(1-ci)/2)))
+    p_stats <- function(x){stats <- c(min = suppressWarnings(min(x, na.rm = TRUE)), quantile(x, probs = quants, na.rm = TRUE), max = suppressWarnings(max(x, na.rm = TRUE)), mean = mean(x, na.rm = TRUE), sd = sd(x, na.rm = TRUE), mode = tryCatch(suppressWarnings(modeest::mlv1(x[is.finite(x)], method = "shorth")), error = function(e) NA), kurtosis = tryCatch(suppressWarnings(moments::kurtosis(x[is.finite(x)], na.rm = TRUE)), error = function(e) NA), skewness = tryCatch(suppressWarnings(moments::skewness(x[is.finite(x)], na.rm = TRUE)), error = function(e) NA)); return(stats)}
+    preds <- as.data.frame(map2(colMeans(preds), as.data.frame(collected_errors), ~ .x + sample(.y, size = 1000, replace = TRUE)))
+    quantile_preds <- t(apply(preds, 2, p_stats))
+    iqr_to_range <- tryCatch((quantile_preds[, "75%"] - quantile_preds[, "25%"])/(quantile_preds[, "max"] - quantile_preds[, "min"]), error = function(e) NA)
+    risk_ratio <- tryCatch((quantile_preds[, "max"] - quantile_preds[, "50%"])/(quantile_preds[, "50%"] - quantile_preds[, "min"]), error = function(e) NA)
+    growths <- mapply(function(m, s) rnorm(n_trials, m, s), m = quantile_preds[, "mean"], s = quantile_preds[, "sd"])
+    upside_prob <- tryCatch(c(NA, colMeans(apply(growths[,-1]/growths[,-ncol(growths)], 2, function(x) x > 1))), error = function(e) NA)
+    pvalues <- mapply(function(m, s) pnorm(seq(min(quantile_preds[, "min"]), max(quantile_preds[, "max"]), length.out = n_trials), m, s), m = quantile_preds[, "mean"], s = quantile_preds[, "sd"])
+    divergence <- tryCatch(c(NA, apply(pvalues[,-1] - pvalues[,-ncol(growths)], 2, function(x) abs(max(x, na.rm = TRUE)))), error = function(e) NA)
+    quantile_preds <- round(cbind(quantile_preds, iqr_to_range = iqr_to_range, risk_ratio = risk_ratio, upside_prob = upside_prob, divergence = divergence), 3)
 
-  quants <- sort(unique(c((1-ci)/2, 0.25, 0.5, 0.75, ci+(1-ci)/2)))
-  p_stats <- function(x){stats <- c(min = suppressWarnings(min(x, na.rm = T)), quantile(x, probs = quants, na.rm = T), max = suppressWarnings(max(x, na.rm = T)), mean = mean(x, na.rm = T), sd = sd(x, na.rm = T), mode = tryCatch(suppressWarnings(modeest::mlv1(x[is.finite(x)], method = "shorth")), error = function(e) NA), kurtosis = tryCatch(suppressWarnings(moments::kurtosis(x[is.finite(x)], na.rm = T)), error = function(e) NA), skewness = tryCatch(suppressWarnings(moments::skewness(x[is.finite(x)], na.rm = T)), error = function(e) NA)); return(stats)}
-  quantile_preds <- t(apply(preds, 2, p_stats))
-  iqr_to_range <- tryCatch((quantile_preds[, "75%"] - quantile_preds[, "25%"])/(quantile_preds[, "max"] - quantile_preds[, "min"]), error = function(e) NA)
-  risk_ratio <- tryCatch((quantile_preds[, "max"] - quantile_preds[, "50%"])/(quantile_preds[, "50%"] - quantile_preds[, "min"]), error = function(e) NA)
-  growths <- mapply(function(m, s) rnorm(n_trials, m, s), m = quantile_preds[, "mean"], s = quantile_preds[, "sd"])
-  upside_prob <- tryCatch(c(NA, colMeans(apply(growths[,-1]/growths[,-ncol(growths)], 2, function(x) x > 1))), error = function(e) NA)
-  pvalues <- mapply(function(m, s) pnorm(seq(min(quantile_preds[, "min"]), max(quantile_preds[, "max"]), length.out = n_trials), m, s), m = quantile_preds[, "mean"], s = quantile_preds[, "sd"])
-  divergence <- tryCatch(c(NA, apply(pvalues[,-1] - pvalues[,-ncol(growths)], 2, function(x) abs(max(x, na.rm = T)))), error = function(e) NA)
-  quantile_preds <- round(cbind(quantile_preds, iqr_to_range = iqr_to_range, risk_ratio = risk_ratio, upside_prob = upside_prob, divergence = divergence), 3)
+    if(is.null(dates)){hist_dates <- 1:length(orig); forcat_dates <- (length(orig) + 1):(length(orig) + seq_len); rownames(quantile_preds) <- paste0("t", 1:seq_len)}
+    if(!is.null(dates)){hist_dates <- tail(dates, length(orig)); forcat_dates <- seq.Date(tail(dates, 1), tail(dates, 1) + seq_len * mean(diff(dates)), length.out = seq_len); rownames(quantile_preds) <- as.character(forcat_dates)}
+    x_lab <- paste0("Forecasting Horizon for sequence n = ", seq_len)
+    y_lab <- paste0("Forecasting Values for ", feat_name)
 
-  if(is.null(dates)){hist_dates <- 1:length(orig); forcat_dates <- (length(orig) + 1):(length(orig) + seq_len); rownames(quantile_preds) <- paste0("t", 1:seq_len)}
-  if(!is.null(dates)){hist_dates <- tail(dates, length(orig)); forcat_dates <- seq.Date(tail(dates, 1), tail(dates, 1) + seq_len * mean(diff(dates)), length.out = seq_len); rownames(quantile_preds) <- as.character(forcat_dates)}
-  x_lab <- paste0("Forecasting Horizon for sequence n = ", seq_len)
-  y_lab <- paste0("Forecasting Values for ", feat_name)
+    plot <- ts_graph(x_hist = hist_dates, y_hist = orig, x_forcat = forcat_dates, y_forcat = quantile_preds[, "50%"], lower = quantile_preds[, "10%"], upper = quantile_preds[, "90%"],
+                     label_x = x_lab, label_y = y_lab)
+  }
 
-  plot <- ts_graph(x_hist = hist_dates, y_hist = orig, x_forcat = forcat_dates, y_forcat = quantile_preds[, "50%"], lower = quantile_preds[, "10%"], upper = quantile_preds[, "90%"],
-                   label_x = x_lab, label_y = y_lab)
-
-  outcome <- list(errors = errors, quantile_preds = quantile_preds, plot = plot)
+  outcome <- list(errors = errors, raw_errors = raw_errors, quantile_preds = quantile_preds, plot = plot)
   return(outcome)
 }
 
@@ -99,7 +105,7 @@ spectral_transformation <- function(ts)
 spectral_inversion <- function(complex = NULL, real, imaginary)
 {
   if(is.null(complex)){complex <- complex(real = real, imaginary = imaginary)}
-  out <- Re(fft(complex, inverse = T)/length(complex))
+  out <- Re(fft(complex, inverse = TRUE)/length(complex))
   return(out)
 }
 
@@ -163,7 +169,7 @@ invdiff <- function(vector, heads)
 
 ####
 
-jacknife_index <- function(v, n) {ifelse(n <= 0, n <- 1, n); n <- n - 1; purrr::map(1:(length(v) - n), ~ v[- (.x:(.x+n))])}
+jacknife_index <- function(v, n) {ifelse(n <= 0, n <- 1, n); n <- n - 1; map(1:(length(v) - n), ~ v[- (.x:(.x+n))])}
 
 
 ####

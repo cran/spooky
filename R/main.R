@@ -18,9 +18,12 @@
 #' \itemize{
 #' \item exploration: list of all not-null models, complete with predictions, test metrics, prediction stats and plot
 #' \item history: a table with the sampled models, hyper-parameters, validation errors, weighted average rank
+#' \item best_model: results for the best selected model according to the weighted average rank, including:
+#' \itemize{
 #' \item testing_errors: testing errors for each time feature for the best selected model (me, mae, mse, rmsse, mpe, mape, rmae, rrmse, rame, mase, smse, sce, gmrae)
 #' \item preds: min, max, q25, q50, q75, quantiles at selected ci, mean, sd, mode, skewness, kurtosis, IQR to range, risk ratio, upside probability and divergence for each point fo predicted sequences
 #' \item plots: standard plot with confidence interval for each time feature
+#' }
 #' \item time_log
 #' }
 #'
@@ -85,9 +88,11 @@ spooky <- function(df, seq_len = NULL, lno = NULL, n_samp = 30, n_windows = 3, c
   plots <- purrr::map(best_model$model, ~ .x$plot)
   names(plots) <- feat_names
 
+  best_model <- list(testing_errors = testing_errors, preds = preds, plots = plots)
+
   toc(log = TRUE)
   time_log <- seconds_to_period(round(parse_number(unlist(tic.log())), 0))
 
-  outcome <- list(exploration = exploration, history = history, testing_errors = testing_errors, preds = preds, plots = plots, time_log = time_log)
+  outcome <- list(exploration = exploration, history = history, best_model = best_model, time_log = time_log)
   return(outcome)
 }
