@@ -1,11 +1,11 @@
-d4a0f5ac82909b2e2b0bc2d959baabbe *DESCRIPTION
-51a831a177fdee0b818698517ec4947d *NAMESPACE
-b8fba0c3d34b06382b8b1e1645eafe50 *NEWS.md
+bdb72ef409eaf9ca04ab8f502ae4c052 *DESCRIPTION
+7ad3c28bf9a1352e012f1e09763a0faa *NAMESPACE
+371696f057028a7721bc67a5afc182d9 *NEWS.md
 4b23a273100b6cf36360754b1fbc25df *R/data.R
 3d4051df2eeabdb9ed69d9c67bf3fdf2 *R/hood.R
-764dc5d985a1fdfd9d8764dcd1398212 *R/main.R
+c79f1db84979d1753a1a84a0229415cc *R/main.R
 c5a50796c58bdf41a410c930e6fbe9d6 *R/spooky.R
 5218dea2272d99c1ec4089718cd7b166 *data/time_features.rda
-6ed558cf70e195dd93ea4dad89be4663 *man/spooky.Rd
+a8a97abb72817d26073d921e439820af *man/spooky.Rd
 07e2ab14b1ea6ec36b0575b82878a808 *man/time_features.Rd
-33099f18c4185f694bc8510b86bd83e5 *man/windower.Rd
+6b04d5c1b4bb37d8329978a971cfd271 *man/windower.Rd

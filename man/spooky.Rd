@@ -17,6 +17,7 @@ spooky(
   dates = NULL,
   error_scale = "naive",
   error_benchmark = "naive",
+  bounds = NULL,
   seed = 42
 )
 }
@@ -41,17 +42,19 @@ spooky(
 
 \item{error_benchmark}{String. Benchmark for the relative error metrics. Two options: "naive" (sequential extension of last value) or "average" (mean value of true sequence). Default: "naive".}
 
+\item{bounds}{list of numeric vector, with minimum and maximum bounds for each numeric features. Default: NULL}
+
 \item{seed}{Positive integer. Random seed. Default: 42.}
 }
 \value{
 This function returns a list including:
 \itemize{
 \item exploration: list of all not-null models, complete with predictions, test metrics, prediction stats and plot
-\item history: a table with the sampled models, hyper-parameters, validation errors, weighted average rank
+\item history: a table with the sampled models, hyper-parameters, validation errors
 \item best_model: results for the best selected model according to the weighted average rank, including:
 \itemize{
-\item testing_errors: testing errors for each time feature for the best selected model (me, mae, mse, rmsse, mpe, mape, rmae, rrmse, rame, mase, smse, sce, gmrae)
-\item preds: min, max, q25, q50, q75, quantiles at selected ci, mean, sd, mode, skewness, kurtosis, IQR to range, risk ratio, upside probability and divergence for each point fo predicted sequences
+\item testing_errors: testing errors for each time feature for the best selected model (for continuous variables: me, mae, mse, rmsse, mpe, mape, rmae, rrmse, rame, mase, smse, sce, gmrae; for factor variables: czekanowski, tanimoto, cosine, hassebrook, jaccard, dice, canberra, gower, lorentzian, clark)
+\item preds: for continuous variables, min, max, q25, q50, q75, quantiles at selected ci, mean, sd, mode, skewness, kurtosis, IQR to range, risk ratio, upside probability and divergence for each point fo predicted sequences; for factor variables, min, max, q25, q50, q75, quantiles at selected ci, proportions, difformity (deviation of proportions normalized over the maximum possible deviation), entropy, upgrade probability and divergence for each point fo predicted sequences
 \item plots: standard plot with confidence interval for each time feature
 }
 \item time_log
