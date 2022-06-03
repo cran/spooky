@@ -51,6 +51,7 @@
 #'@examples
 #'spooky(time_features, seq_len = c(10, 30), lno = c(1, 30), n_samp = 1)
 #'
+#'
 
 spooky <- function(df, seq_len = NULL, lno = NULL, n_samp = 30, n_windows = 3, ci = 0.8, smoother = FALSE, dates = NULL, error_scale = "naive", error_benchmark = "naive", bounds = NULL, seed = 42)
 {
@@ -196,8 +197,9 @@ engine <- function(ts, seq_len, lno = 1, testing = NULL, ci = 0.8, dates = NULL,
     x_lab <- paste0("Forecasting Horizon for sequence n = ", seq_len)
     y_lab <- paste0("Forecasting Values for ", feat_name)
 
-    plot <- ts_graph(x_hist = hist_dates, y_hist = orig, x_forcat = forcat_dates, y_forcat = quantile_preds[, "50%"], lower = quantile_preds[, "10%"], upper = quantile_preds[, "90%"],
+    plot <- ts_graph(x_hist = hist_dates, y_hist = orig, x_forcat = forcat_dates, y_forcat = quantile_preds[, 4], lower = quantile_preds[, 2], upper = quantile_preds[, 6],
                      label_x = x_lab, label_y = y_lab)
+
   }
 
   outcome <- list(errors = errors, raw_errors = raw_errors, pred_scores = pred_scores, quantile_preds = quantile_preds, plot = plot)

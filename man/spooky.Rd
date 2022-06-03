@@ -66,6 +66,7 @@ Automatic jack-knife of spectral analysis for time feature extrapolation
 \examples{
 spooky(time_features, seq_len = c(10, 30), lno = c(1, 30), n_samp = 1)
 
+
 }
 \seealso{
 Useful links:
