@@ -17,7 +17,6 @@ spooky(
   dates = NULL,
   error_scale = "naive",
   error_benchmark = "naive",
-  bounds = NULL,
   seed = 42
 )
 }
@@ -41,8 +40,6 @@ spooky(
 \item{error_scale}{String. Scale for the scaled error metrics. Two options: "naive" (average of naive one-step absolute error for the historical series) or "deviation" (standard error of the historical series). Default: "naive".}
 
 \item{error_benchmark}{String. Benchmark for the relative error metrics. Two options: "naive" (sequential extension of last value) or "average" (mean value of true sequence). Default: "naive".}
-
-\item{bounds}{list of numeric vector, with minimum and maximum bounds for each numeric features. Default: NULL}
 
 \item{seed}{Positive integer. Random seed. Default: 42.}
 }

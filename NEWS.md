@@ -11,3 +11,7 @@
 
 # spooky 1.3.0
 * Fixed a bug in quantile graph representation.
+
+
+# spooky 1.4.0
+* Rationalization and streamlining of processes.
